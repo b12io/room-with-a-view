@@ -87,6 +87,22 @@ class RoomWithAViewCommand(object):
         finally:
             self.conn.close()
 
+    def get_views_from_file(self, filename):
+        dependency_graph = {}
+        self.parse_file(filename, dependency_graph)
+        return dependency_graph.keys()
+
+    def parse_file(self, filename, dependency_graph):
+        with open(filename, 'r') as sql_file:
+            sql_contents = sql_file.read()
+
+            for statement in sql_contents.split(';'):
+                view_name, view_body = (
+                    self.parse_create_view_statement(statement))
+                if view_name is not None:
+                    dependency_graph[view_name] = DependencyGraphNode(
+                        view_name, view_body)
+
     def parse_dependency_graph(self):
         dependency_graph = {}
         for directory in self.directories:
@@ -95,15 +111,7 @@ class RoomWithAViewCommand(object):
                     if not basename.lower().endswith('.sql'):
                         continue
                     filename = os.path.join(root, basename)
-                    with open(filename, 'r') as sql_file:
-                        sql_contents = sql_file.read()
-
-                    for statement in sql_contents.split(';'):
-                        view_name, view_body = (
-                            self.parse_create_view_statement(statement))
-                        if view_name is not None:
-                            dependency_graph[view_name] = DependencyGraphNode(
-                                view_name, view_body)
+                    self.parse_file(filename, dependency_graph)
 
         view_names = dependency_graph.keys()
         for node in dependency_graph.values():
@@ -125,14 +133,13 @@ class RoomWithAViewCommand(object):
         if not view_names and not file_names:
             raise ValueError('Either --view-names or --file-names is required '
                              'for the "drop" action.')
+        for file_name in file_names:
+            view_names.extend(self.get_views_from_file(file_name))
+
         for view_name in view_names:
             if view_name not in self.dependency_graph:
                 raise ValueError(
                     'unrecognized view name: {}'.format(view_name))
-        for file_name in file_names:
-            print(
-                'Not dropping file: {}. Dropping files is not yet supported.'
-                .format(file_name))
 
         for view_name in view_names:
             self.drop_node(self.dependency_graph[view_name])
@@ -159,14 +166,15 @@ class RoomWithAViewCommand(object):
         if not view_names and not file_names:
             raise ValueError('Either --view-names or --file-names is required '
                              'for the "drop" action.')
+
+        for file_name in file_names:
+            view_names.extend(self.get_views_from_file(file_name))
+
         for view_name in view_names:
             if view_name not in self.dependency_graph:
+                print(self.dependency_graph.keys())
                 raise ValueError(
                     'unrecognized view name: {}'.format(view_name))
-        for file_name in file_names:
-            print(
-                'Not dropping file: {}. Dropping files is not yet supported.'
-                .format(file_name))
 
         # First, build a graph containing only nodes reachable from the views
         # to sync.
