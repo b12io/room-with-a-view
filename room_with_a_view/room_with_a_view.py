@@ -76,10 +76,16 @@ class RoomWithAViewCommand(object):
             raise ValueError('Unable to read settings.yaml: {}'.format(str(e)))
 
     def handle(self):
-        self.parse_args()
-        self.dependency_graph = self.parse_dependency_graph()
-        handler = self.actions[self.options.action][1]
-        handler()
+        try:
+            self.parse_args()
+            self.dependency_graph = self.parse_dependency_graph()
+            handler = self.actions[self.options.action][1]
+            handler()
+            self.conn.commit()
+        except Exception as e:
+            print(e)
+        finally:
+            self.conn.close()
 
     def parse_dependency_graph(self):
         dependency_graph = {}
@@ -107,9 +113,6 @@ class RoomWithAViewCommand(object):
             for dependency in dependencies:
                 dependency_graph[dependency].in_edges.add(node.view_name)
         return dependency_graph
-
-    def sync_views(self):
-        print('SYNC-VIEWS: Not yet implemented.')
 
     def drop_views(self):
         """ Drops one or more views from Redshift.
@@ -143,39 +146,111 @@ class RoomWithAViewCommand(object):
         for node in self.dependency_graph.values():
             self.drop_node(node)
 
-    def sync_all(self):
-        """ Syncs all views within a set of directories to Redshift.
+    def sync_views(self):
+        """ Syncs one or more views with Redshift.
 
-        Uses Kahn's algorithm to drop and recreate views in a topological
-        ordering that respects dependencies (read more here:
-        https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm).
+        Since deleting a view will cascade, we have to recreate all views
+        dependent on it, in topological order. To identify the order in which
+        views need to be recreated, we do a depth-first search over the
+        dependency graph for each view we're syncing.
         """
+        view_names = self.options.view_names
+        file_names = self.options.file_names
+        if not view_names and not file_names:
+            raise ValueError('Either --view-names or --file-names is required '
+                             'for the "drop" action.')
+        for view_name in view_names:
+            if view_name not in self.dependency_graph:
+                raise ValueError(
+                    'unrecognized view name: {}'.format(view_name))
+        for file_name in file_names:
+            print(
+                'Not dropping file: {}. Dropping files is not yet supported.'
+                .format(file_name))
+
+        # First, build a graph containing only nodes reachable from the views
+        # to sync.
+        starting_nodes = [self.dependency_graph[view_name]
+                          for view_name in view_names]
+        subgraph_node_names = self.traverse_graph(starting_nodes,
+                                                  dependency_order=False)
+        subgraph = {}
+        for node_name in subgraph_node_names:
+            original_node = self.dependency_graph[node_name]
+            new_node = DependencyGraphNode(node_name, original_node.view_body)
+            subgraph[node_name] = new_node
+            new_node.in_edges = set([edge for edge in original_node.in_edges
+                                     if edge in subgraph_node_names])
+            new_node.out_edges = set([edge for edge in original_node.out_edges
+                                      if edge in subgraph_node_names])
+
+        # Then, drop all the views.
+        for node in starting_nodes:
+            self.drop_node(node)
+
+        # Finally, run Kahn's algorithm to recreate the subgraph in dependency
+        # order.
+        starting_nodes = [node for node in subgraph.values()
+                          if not node.out_edges]
+        self.traverse_graph(starting_nodes, graph=subgraph,
+                            visit_function=self.create_node)
+
+    def sync_all(self):
+        """ Syncs all views to Redshift. """
+        starting_nodes = [node for node in self.dependency_graph.values()
+                          if not node.out_edges]
+        self.traverse_graph(
+            starting_nodes, visit_function=self.drop_and_recreate_node)
+
+    def traverse_graph(self, starting_nodes, graph=None, visit_function=None,
+                       dependency_order=True):
+        """ Traverses a dependency graph and returns the visited nodes' names.
+
+        This is a breadth first search over the graph.
+        :param starting_nodes: the set of nodes from which to run the search.
+        :param graph: the graph to search over.
+        :param visit_function: A function to run at each node visited.
+        :param dependency_order: if True, nodes will be visited in a
+          topological order guaranteed not to violate dependencies. This is
+          enforced using Kahn's algorithm (read more here:
+          https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm).
+        :returns: A set of visited node names.
+        """
+        graph = graph or self.dependency_graph
         visited_nodes = set()
-        active_nodes = [node for node in self.dependency_graph.values()
-                        if not node.out_edges]
+        active_nodes = starting_nodes
         while active_nodes:
+            # Pop a new node off the queue
             active_node = active_nodes[0]
             active_nodes = active_nodes[1:]
             if active_node.view_name in visited_nodes:
                 continue
+
+            # Visit the node
             visited_nodes.add(active_node.view_name)
-            self.drop_and_recreate_node(active_node)
+            if visit_function:
+                visit_function(active_node)
+
+            # Add neighboring nodes to the queue
             for view_name in active_node.in_edges:
-                next_node = self.dependency_graph[view_name]
-                if not (self.dependency_graph[view_name].out_edges -
-                        visited_nodes):
+                next_node = graph[view_name]
+                unvisited_dependents = next_node.out_edges - visited_nodes
+                if not dependency_order or not unvisited_dependents:
                     active_nodes.append(next_node)
+        return visited_nodes
 
     def execute_sql(self, sql_statement):
-        print('EXECUTING: {}'.format(sql_statement))
+        # print('EXECUTING: {}'.format(sql_statement))
         with self.conn.cursor() as cursor:
             cursor.execute(sql_statement)
 
     def drop_node(self, node):
+        print('Dropping view: {}'.format(node.view_name))
         self.execute_sql('DROP VIEW IF EXISTS {} CASCADE;'.format(
             node.view_name))
 
     def create_node(self, node):
+        print('Creating view: {}'.format(node.view_name))
         self.execute_sql('CREATE VIEW {} AS {};'.format(
             node.view_name, node.view_body))
 
