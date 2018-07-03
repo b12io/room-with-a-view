@@ -10,28 +10,22 @@ class RoomWithAViewCommand(object):
 
     def __init__(self):
         self.actions = {
-            'sync': ('Syncs a single view (identified by the --view-name '
-                     'parameter)',
-                     self.sync_view),
+            'sync': ('Syncs specific views (identified by the --view-names '
+                     'or --file-names parameters)',
+                     self.sync_views),
             'sync-all': ('Syncs all views in all .sql files in a set of '
                          'directories (identified by the --directories '
                          'parameter). The directory will be searched '
                          'recursively',
                          self.sync_all),
-            'sync-file': ('Syncs all views in a single .sql file (identified '
-                          'by the --file-name parameter)',
-                          self.sync_file),
-            'drop': ('Drops a single view (identified by the --view-name '
-                     'parameter)',
-                     self.drop_view),
+            'drop': ('Drops specific views (identified by the --view-names '
+                     'or --file-names parameters)',
+                     self.drop_views),
             'drop-all': ('Drops all views in all .sql files in a set of '
                          'directories (identified by the --directories '
                          'parameter). The directory will be searched '
                          'recursively',
                          self.drop_all),
-            'drop-file': ('Drops all views in a single .sql file (identified '
-                          'by the --file-name parameter)',
-                          self.drop_file),
         }
 
     def parse_args(self):
@@ -44,10 +38,12 @@ class RoomWithAViewCommand(object):
             formatter_class=argparse.RawDescriptionHelpFormatter)
         parser.add_argument('action', type=str, choices=self.actions.keys(),
                             help='The action to perform.')
-        parser.add_argument('--view-name', type=str, required=False,
-                            help=('The view name to manage.'))
-        parser.add_argument('--file-name', type=str, required=False,
-                            help=('The .sql file name to manage.'))
+        parser.add_argument('--view-names', type=str, nargs='*',
+                            metavar='VIEW-NAME', default=[],
+                            help=('View names to manage.'))
+        parser.add_argument('--file-names', type=str, nargs='*',
+                            metavar='FILE-PATH', default=[],
+                            help=('Paths to .sql files to manage.'))
         parser.add_argument('--connection', type=str, required=False,
                             default='default', help=(
                                 'Name of the Redshift connection to use (or '
@@ -58,10 +54,14 @@ class RoomWithAViewCommand(object):
                             help=('Directory names to search for SQL files '
                                   '(or "default" if not specified). Names '
                                   'must match directories in settings.yaml'))
+        parser.add_argument('--settings', type=str, required=False,
+                            default='settings.yaml', help=(
+                                'Location of the settings file (settings.yaml '
+                                'by default)'))
         self.options = parser.parse_args()
 
         try:
-            with open("settings.yaml", 'r') as stream:
+            with open(self.options.settings, 'r') as stream:
                 settings = yaml.load(stream)
                 connection_options = settings['connections'].get(
                     self.options.connection)
@@ -86,7 +86,7 @@ class RoomWithAViewCommand(object):
         for directory in self.directories:
             for root, dirs, files in os.walk(directory):
                 for basename in files:
-                    if not basename.endswith('.sql'):
+                    if not basename.lower().endswith('.sql'):
                         continue
                     filename = os.path.join(root, basename)
                     with open(filename, 'r') as sql_file:
@@ -108,27 +108,51 @@ class RoomWithAViewCommand(object):
                 dependency_graph[dependency].in_edges.add(node.view_name)
         return dependency_graph
 
-    def sync_view(self):
-        print('SYNC-VIEW: Not yet implemented.')
+    def sync_views(self):
+        print('SYNC-VIEWS: Not yet implemented.')
 
-    def sync_file(self):
-        print('SYNC-FILE: Not yet implemented.')
+    def drop_views(self):
+        """ Drops one or more views from Redshift.
 
-    def drop_view(self):
-        print('DROP-VIEW: Not yet implemented.')
+        Views to drop are specified with either the '--view-names' or the
+        '--file-names' arguments.
+        """
+        view_names = self.options.view_names
+        file_names = self.options.file_names
+        if not view_names and not file_names:
+            raise ValueError('Either --view-names or --file-names is required '
+                             'for the "drop" action.')
+        for view_name in view_names:
+            if view_name not in self.dependency_graph:
+                raise ValueError(
+                    'unrecognized view name: {}'.format(view_name))
+        for file_name in file_names:
+            print(
+                'Not dropping file: {}. Dropping files is not yet supported.'
+                .format(file_name))
+
+        for view_name in view_names:
+            self.drop_node(self.dependency_graph[view_name])
 
     def drop_all(self):
-        print('DROP-ALL: Not yet implemented.')
+        """ Drops all views within a set of directories from Redshift.
 
-    def drop_file(self):
-        print('DROP-FILE: Not yet implemented.')
+        Since we cascade our drops and only drop views that already exist,
+        the order in which we drop views doesn't matter.
+        """
+        for node in self.dependency_graph.values():
+            self.drop_node(node)
 
     def sync_all(self):
+        """ Syncs all views within a set of directories to Redshift.
+
+        Uses Kahn's algorithm to drop and recreate views in a topological
+        ordering that respects dependencies (read more here:
+        https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm).
+        """
         visited_nodes = set()
         active_nodes = [node for node in self.dependency_graph.values()
                         if not node.out_edges]
-        #print([n.view_name for n in active_nodes])
-        #print(dependency_graph['client_business_categories'])
         while active_nodes:
             active_node = active_nodes[0]
             active_nodes = active_nodes[1:]
@@ -138,7 +162,6 @@ class RoomWithAViewCommand(object):
             self.drop_and_recreate_node(active_node)
             for view_name in active_node.in_edges:
                 next_node = self.dependency_graph[view_name]
-                # print(next_node.view_name, next_node.out_edges, visited_nodes)
                 if not (self.dependency_graph[view_name].out_edges -
                         visited_nodes):
                     active_nodes.append(next_node)
@@ -148,12 +171,17 @@ class RoomWithAViewCommand(object):
         with self.conn.cursor() as cursor:
             cursor.execute(sql_statement)
 
+    def drop_node(self, node):
+        self.execute_sql('DROP VIEW IF EXISTS {} CASCADE;'.format(
+            node.view_name))
+
+    def create_node(self, node):
+        self.execute_sql('CREATE VIEW {} AS {};'.format(
+            node.view_name, node.view_body))
+
     def drop_and_recreate_node(self, node):
-        drop_sql = 'DROP VIEW IF EXISTS {} CASCADE;'.format(node.view_name)
-        create_sql = 'CREATE VIEW {} AS {};'.format(
-            node.view_name, node.view_body)
-        self.execute_sql(drop_sql)
-        self.execute_sql(create_sql)
+        self.drop_node(node)
+        self.create_node(node)
 
     def parse_create_view_statement(self, statement):
         view_name = None
