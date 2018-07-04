@@ -282,8 +282,8 @@ class RoomWithAViewCommand(object):
             return view_name, view_body
 
         first_line = statement_lines[0]
-        if ('CREATE VIEW' in first_line.upper() or
-            'CREATE OR REPLACE VIEW' in first_line.upper()):
+        if 'CREATE VIEW' in first_line.upper() or (
+                'CREATE OR REPLACE VIEW' in first_line.upper()):
             view_name = self.get_view_name(first_line)
             view_body = '\n'.join(statement_lines[1:])
         return view_name, view_body
@@ -312,7 +312,8 @@ class DependencyGraphNode(object):
 
     def __repr__(self):
         return 'View {} (depends on {}) (depended on by {})'.format(
-            self.view_name, ', '.join(self.out_edges), ', '.join(self.in_edges))
+            self.view_name, ', '.join(self.out_edges),
+            ', '.join(self.in_edges))
 
 
 if __name__ == '__main__':
