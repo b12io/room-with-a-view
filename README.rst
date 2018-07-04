@@ -46,12 +46,12 @@ benefits are:
 Setup
 -----
 
-* Copy `settings.yaml.default` to `settings.yaml`, and edit the file to configure your Redshift connection and the location of your .sql files. Example `settings.yaml` file:
+* Copy ``settings.yaml.default`` to ``settings.yaml``, and edit the file to configure your Redshift connection and the location of your .sql files. Example ``settings.yaml`` file:
 
   .. raw:: yaml
-     :file: settings.yaml.default
+     :file: room_with_a_view/settings.yaml.default
 
-* Install requirements with `pip install -r requirements.txt`
+* Install requirements with ``pip install -r requirements.txt``
 
 Usage
 -----
@@ -95,13 +95,13 @@ Usage
 Examples
 --------
 
-* `room_with_a_view.py sync-all`: Syncs all views in all SQL files in the default directory specified in `settings.yaml`. Drops and recreates existing views, and makes sure views are created in dependency order.
+* ``room_with_a_view.py sync-all``: Syncs all views in all SQL files in the default directory specified in ``settings.yaml``. Drops and recreates existing views, and makes sure views are created in dependency order.
 
-* `room_with_a_view.py sync --view-names my_view1 my_view2 --file-names ../sql/my_file.sql`: Syncs the specific views `my_view1` and `my_view2`, as well as all views in the file `../sql/my_file.sql`.
+* ``room_with_a_view.py sync --view-names my_view1 my_view2 --file-names ../sql/my_file.sql``: Syncs the specific views ``my_view1`` and ``my_view2``, as well as all views in the file ``../sql/my_file.sql``.
 
-* `room_with_a_view.py drop-all --connection other_connection`: Drops all views in the default directory, using the connection info specified in `settings.yaml` under the name `other_connection` to connect to Redshift.
+* ``room_with_a_view.py drop-all --connection other_connection``: Drops all views in the default directory, using the connection info specified in ``settings.yaml`` under the name ``other_connection`` to connect to Redshift.
 
-* `room_with_a_view.py drop --view-names my_view1 --directories other_dir1 other_dir2 --settings /path/to/fancy_settings.yaml`: Drops the view `my_view1`, looking for SQL files that contain the view and its dependents in the directories specified by `other_dir1` and `other_dir2` in the settings file located in `/path/to/fancy_settings.yaml`.
+* ``room_with_a_view.py drop --view-names my_view1 --directories other_dir1 other_dir2 --settings /path/to/fancy_settings.yaml``: Drops the view ``my_view1``, looking for SQL files that contain the view and its dependents in the directories specified by ``other_dir1`` and ``other_dir2`` in the settings file located in ``/path/to/fancy_settings.yaml``.
 
 Credits
 -------
