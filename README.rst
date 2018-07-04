@@ -48,8 +48,18 @@ Setup
 
 * Copy ``settings.yaml.default`` to ``settings.yaml``, and edit the file to configure your Redshift connection and the location of your .sql files. Example ``settings.yaml`` file:
 
-  .. raw:: yaml
-     :file: room_with_a_view/settings.yaml.default
+.. code-block:: yaml
+
+   connections:
+     default:
+       host: localhost
+       port: 5432
+       user: awsuser
+       password: **CHANGEME**
+       dbname: postgres
+
+   directories:
+     default: .
 
 * Install requirements with ``pip install -r requirements.txt``
 
