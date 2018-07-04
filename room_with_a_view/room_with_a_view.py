@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
 import os
@@ -85,7 +86,8 @@ class RoomWithAViewCommand(object):
         except Exception as e:
             print(e)
         finally:
-            self.conn.close()
+            if hasattr(self, 'conn'):
+                self.conn.close()
 
     def get_views_from_file(self, filename):
         dependency_graph = {}
