@@ -196,8 +196,10 @@ class RoomWithAViewCommand(object):
 
         Since deleting a view will cascade, we have to recreate all views
         dependent on it, in topological order. To identify the order in which
-        views need to be recreated, we do a depth-first search over the
-        dependency graph for each view we're syncing.
+        views need to be recreated, we build a subgraph consisting of only
+        views that can be reached from the views we're syncing, then recreate
+        the views in topological order on the subgraph using Kahn's algorithm
+        (as we do in ``sync_all()``).
         """
         statement_names = self.options.view_names
         file_names = self.options.file_names
