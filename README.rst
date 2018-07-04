@@ -70,27 +70,29 @@ Usage
 
 ::
 
-    usage: room_with_a_view.py [-h] [--view-names [VIEW-NAME [VIEW-NAME ...]]]
+    usage: room_with_a_view.py [-h]
+                               [--view-names [VIEW-OR-FUNCTION-NAME [VIEW-OR-FUNCTION-NAME ...]]]
                                [--file-names [FILE-PATH [FILE-PATH ...]]]
                                [--connection CONNECTION]
                                [--directories [DIRECTORY [DIRECTORY ...]]]
-                               [--settings SETTINGS]
-                               {sync-all,sync,drop,drop-all}
+                               [--settings SETTINGS] [--verbosity VERBOSITY]
+                               {sync,drop-all,sync-all,list,drop}
 
     Manages Redshift SQL views. Possible actions:
-	    sync-all: Syncs all views in all .sql files in a set of directories (identified by the --directories parameter). The directory will be searched recursively
-	    sync: Syncs specific views (identified by the --view-names or --file-names parameters)
-	    drop: Drops specific views (identified by the --view-names or --file-names parameters)
-	    drop-all: Drops all views in all .sql files in a set of directories (identified by the --directories parameter). The directory will be searched recursively
+        sync: Syncs specific views or functions (identified by the --view-names or --file-names parameters).
+        drop-all: Drops all views and functions in all .sql files in a set of directories (identified by the --directories parameter). The directory will be searched recursively.
+        sync-all: Syncs all views and functions in all .sql files in a set of directories (identified by the --directories parameter). The directory will be searched recursively.
+        list: lists all known views and functions.
+        drop: Drops specific views or functions (identified by the --view-names or --file-names parameters).
 
     positional arguments:
-      {sync-all,sync,drop,drop-all}
+      {sync,drop-all,sync-all,list,drop}
                             The action to perform.
 
     optional arguments:
       -h, --help            show this help message and exit
-      --view-names [VIEW-NAME [VIEW-NAME ...]]
-                            View names to manage.
+      --view-names [VIEW-OR-FUNCTION-NAME [VIEW-OR-FUNCTION-NAME ...]]
+                            Names of views or functions to manage.
       --file-names [FILE-PATH [FILE-PATH ...]]
                             Paths to .sql files to manage.
       --connection CONNECTION
@@ -103,15 +105,19 @@ Usage
                             settings.yaml
       --settings SETTINGS   Location of the settings file (settings.yaml by
                             default)
+      --verbosity VERBOSITY
+                            Verbosity of script output. 0 will output nothing, 1
+                            will output names of views and functions being dropped
+                            and created, and 2 will output all executed sql
 
 Examples
 --------
 
-* ``room_with_a_view.py sync-all``: Syncs all views in all SQL files in the default directory specified in ``settings.yaml``. Drops and recreates existing views, and makes sure views are created in dependency order.
+* ``room_with_a_view.py sync-all``: Syncs all views and functions in all SQL files in the default directory specified in ``settings.yaml``. Drops and recreates existing views, and makes sure views are created in dependency order.
 
-* ``room_with_a_view.py sync --view-names my_view1 my_view2 --file-names ../sql/my_file.sql``: Syncs the specific views ``my_view1`` and ``my_view2``, as well as all views in the file ``../sql/my_file.sql``.
+* ``room_with_a_view.py sync --view-names my_view1 my_func1 --file-names ../sql/my_file.sql``: Syncs the specific view ``my_view1`` and function ``my_func1``, as well as all views and functions in the file ``../sql/my_file.sql``.
 
-* ``room_with_a_view.py drop-all --connection other_connection``: Drops all views in the default directory, using the connection info specified in ``settings.yaml`` under the name ``other_connection`` to connect to Redshift.
+* ``room_with_a_view.py drop-all --connection other_connection``: Drops all views and functions in the default directory, using the connection info specified in ``settings.yaml`` under the name ``other_connection`` to connect to Redshift.
 
 * ``room_with_a_view.py drop --view-names my_view1 --directories other_dir1 other_dir2 --settings /path/to/fancy_settings.yaml``: Drops the view ``my_view1``, looking for SQL files that contain the view and its dependents in the directories specified by ``other_dir1`` and ``other_dir2`` in the settings file located in ``/path/to/fancy_settings.yaml``.
 
