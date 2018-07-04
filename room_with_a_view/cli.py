@@ -4,7 +4,7 @@
 
 
 import sys
-from room_with_a_view import RoomWithAViewCommand
+from room_with_a_view.room_with_a_view import RoomWithAViewCommand
 
 
 def main():

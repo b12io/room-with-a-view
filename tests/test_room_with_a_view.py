@@ -29,5 +29,5 @@ def test_command_line_interface():
     command = room_with_a_view.RoomWithAViewCommand()
 
     # Need an 'action' argument on the command-line.
-    with pytest.raises(SystemExit) as exc:
+    with pytest.raises(SystemExit):
         command.handle()
