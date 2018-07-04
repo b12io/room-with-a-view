@@ -46,7 +46,9 @@ benefits are:
 Setup
 -----
 
-* Copy ``settings.yaml.default`` to ``settings.yaml``, and edit the file to configure your Redshift connection and the location of your .sql files. Example ``settings.yaml`` file:
+* Install the package: ``pip install room_with_a_view``.
+
+* Create ``settings.yaml``, and edit the file to configure your Redshift connection and the location of your .sql files. Example ``settings.yaml`` file:
 
 .. code-block:: yaml
 
@@ -61,7 +63,7 @@ Setup
    directories:
      default: .
 
-* Install requirements with ``pip install -r requirements.txt``
+* You're ready to go! Try ``room_with_a_view sync-all`` to sync all your views, or ``room_with_a_view --help`` to learn more about the command.
 
 Usage
 -----
