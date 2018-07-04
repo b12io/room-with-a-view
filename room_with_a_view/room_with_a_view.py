@@ -390,5 +390,6 @@ class DependencyGraphNode(object):
         return '{} {}:\n\t{}'.format(
             self.statement_type.title(), self.name, description)
 
+
 if __name__ == '__main__':
     RoomWithAViewCommand().handle()
