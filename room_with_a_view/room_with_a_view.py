@@ -69,20 +69,17 @@ class RoomWithAViewCommand(object):
                             help='The action to perform.')
         parser.add_argument('--view-names', type=str, nargs='*',
                             metavar='VIEW-OR-FUNCTION-NAME', default=[],
-                            help=('Names of views or functions to manage.'))
+                            help=('Names of views or functions to which to '
+                                  'apply the action.'))
         parser.add_argument('--file-names', type=str, nargs='*',
                             metavar='FILE-PATH', default=[],
-                            help=('Paths to .sql files to manage.'))
+                            help=('Paths to .sql files to which to apply the '
+                                  'action.'))
         parser.add_argument('--connection', type=str, required=False,
                             default='default', help=(
                                 'Name of the Redshift connection to use (or '
                                 '"default", if not specified). The name must '
                                 'match a connection in settings.yaml'))
-        parser.add_argument('--directories', type=str, nargs='*',
-                            metavar='DIRECTORY', default=['default'],
-                            help=('Directory names to search for SQL files '
-                                  '(or "default" if not specified). Names '
-                                  'must match directories in settings.yaml'))
         parser.add_argument('--settings', type=str, required=False,
                             default='settings.yaml', help=(
                                 'Location of the settings file (settings.yaml '
@@ -103,9 +100,7 @@ class RoomWithAViewCommand(object):
                     raise ValueError('Unrecognized connection name: {}'.format(
                         self.options.connection))
                 self.conn = psycopg2.connect(**connection_options)
-                self.directories = [
-                    settings['directories'][directory_name]
-                    for directory_name in self.options.directories]
+                self.directories = settings['directories']
         except Exception as e:
             raise ValueError('Unable to read settings.yaml: {}'.format(str(e)))
 
@@ -160,17 +155,13 @@ class RoomWithAViewCommand(object):
                 dependency_graph[dependency].in_edges.add(node.name)
         return dependency_graph
 
-    def drop_views(self):
-        """ Drops one or more view or functions from Redshift.
-
-        Views and functions to drop are specified with either the
-        '--view-names' or the '--file-names' arguments.
-        """
+    def get_statements_from_arguments(self):
         statement_names = self.options.view_names
         file_names = self.options.file_names
         if not statement_names and not file_names:
-            raise ValueError('Either --view-names or --file-names is required '
-                             'for the "drop" action.')
+            raise ValueError(
+                'Either --view-names or --file-names is required.')
+
         for file_name in file_names:
             statement_names.extend(self.get_statements_from_file(file_name))
 
@@ -178,7 +169,15 @@ class RoomWithAViewCommand(object):
             if statement_name not in self.dependency_graph:
                 raise ValueError('unrecognized view or function name: {}'
                                  .format(statement_name))
+        return statement_names
 
+    def drop_views(self):
+        """ Drops one or more view or functions from Redshift.
+
+        Views and functions to drop are specified with either the
+        '--view-names' or the '--file-names' arguments.
+        """
+        statement_names = self.get_statements_from_arguments()
         for statement_name in statement_names:
             self.drop_node(self.dependency_graph[statement_name])
 
@@ -201,19 +200,7 @@ class RoomWithAViewCommand(object):
         the views in topological order on the subgraph using Kahn's algorithm
         (as we do in ``sync_all()``).
         """
-        statement_names = self.options.view_names
-        file_names = self.options.file_names
-        if not statement_names and not file_names:
-            raise ValueError('Either --view-names or --file-names is required '
-                             'for the "drop" action.')
-
-        for file_name in file_names:
-            statement_names.extend(self.get_statements_from_file(file_name))
-
-        for statement_name in statement_names:
-            if statement_name not in self.dependency_graph:
-                raise ValueError('unrecognized view or function name: {}'
-                                 .format(statement_name))
+        statement_names = self.get_statements_from_arguments()
 
         # First, build a graph containing only nodes reachable from the views
         # and functions to sync.

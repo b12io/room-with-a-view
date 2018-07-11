@@ -30,7 +30,7 @@ Features
 --------
 
 Room with a view is a python script that automatically parses a collection of
-SQL files to find View and Function definitions and their dependencies. It then
+SQL files to find view and function definitions and their dependencies. It then
 makes it easy to sync those views with Redshift, automatically dropping and
 recreating dependent views as necessary so that there are no errors. The key
 benefits are:
@@ -61,7 +61,7 @@ Setup
        dbname: postgres
 
    directories:
-     default: .
+     - .
 
 * You're ready to go! Try ``room_with_a_view sync-all`` to sync all your views, or ``room_with_a_view --help`` to learn more about the command.
 
@@ -74,7 +74,6 @@ Usage
                                [--view-names [VIEW-OR-FUNCTION-NAME [VIEW-OR-FUNCTION-NAME ...]]]
                                [--file-names [FILE-PATH [FILE-PATH ...]]]
                                [--connection CONNECTION]
-                               [--directories [DIRECTORY [DIRECTORY ...]]]
                                [--settings SETTINGS] [--verbosity VERBOSITY]
                                {sync,drop-all,sync-all,list,drop}
 
@@ -92,16 +91,12 @@ Usage
     optional arguments:
       -h, --help            show this help message and exit
       --view-names [VIEW-OR-FUNCTION-NAME [VIEW-OR-FUNCTION-NAME ...]]
-                            Names of views or functions to manage.
+                            Names of views or functions to which to apply the action.
       --file-names [FILE-PATH [FILE-PATH ...]]
-                            Paths to .sql files to manage.
+                            Paths to .sql files to which to apply the action.
       --connection CONNECTION
                             Name of the Redshift connection to use (or "default",
                             if not specified). The name must match a connection in
-                            settings.yaml
-      --directories [DIRECTORY [DIRECTORY ...]]
-                            Directory names to search for SQL files (or "default"
-                            if not specified). Names must match directories in
                             settings.yaml
       --settings SETTINGS   Location of the settings file (settings.yaml by
                             default)

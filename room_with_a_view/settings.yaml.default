@@ -7,4 +7,4 @@ connections:
     dbname: postgres
 
 directories:
-  default: .
+  - .
