@@ -93,7 +93,7 @@ class RoomWithAViewCommand(object):
 
         try:
             with open(self.options.settings, 'r') as stream:
-                settings = yaml.load(stream)
+                settings = yaml.safe_load(stream)
                 connection_options = settings['connections'].get(
                     self.options.connection)
                 if not connection_options:
